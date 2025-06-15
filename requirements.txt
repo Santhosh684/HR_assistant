@@ -1,0 +1,6 @@
+streamlit
+pymupdf
+requests
+scikit-learn
+pandas
+matplotlib
