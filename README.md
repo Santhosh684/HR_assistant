@@ -6,7 +6,7 @@ Built using Python, Streamlit, and free open-source LLMs (via Hugging Face), thi
 
 ---
 
-## 🚀 Features
+## Features
 
 *  Upload multiple resumes (PDF format)
 *  AI-powered skill & experience matching with Job Description
@@ -18,7 +18,7 @@ Built using Python, Streamlit, and free open-source LLMs (via Hugging Face), thi
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 * Python 3.8+
 * Streamlit (for frontend)
@@ -27,7 +27,7 @@ Built using Python, Streamlit, and free open-source LLMs (via Hugging Face), thi
 
 ---
 
-## 📦 Setup Instructions
+## Setup Instructions
 
 ### 1. Clone the Repository
 
@@ -62,7 +62,7 @@ streamlit run app.py
 
 ---
 
-## 📁 Folder Structure
+##  Folder Structure
 
 ```
 hr-recruitment-copilot/
@@ -76,7 +76,7 @@ hr-recruitment-copilot/
 
 ---
 
-## 🧪 Example Use Case
+##  Example Use Case
 
 1. Paste a job description (JD)
 2. Upload multiple candidate resumes (PDF)
@@ -86,7 +86,7 @@ hr-recruitment-copilot/
 
 ---
 
-## 📤 Deployment (Optional)
+##  Deployment (Optional)
 
 * Easily deploy to [Streamlit Cloud](https://streamlit.io/cloud)
 * Use GitHub repo and set secrets like:
@@ -97,7 +97,7 @@ hr-recruitment-copilot/
 
 ---
 
-## 📌 Future Enhancements
+## Future Enhancements
 
 * Export shortlisted candidates to CSV
 * Candidate metadata extraction (email, LinkedIn, etc.)
@@ -106,7 +106,7 @@ hr-recruitment-copilot/
 
 ---
 
-## 🙌 Credits
+##  Credits
 
 * LLM: [Mistral](https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1)
 * Built with ❤️ using Python + Streamlit
