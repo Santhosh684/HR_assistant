@@ -9,7 +9,7 @@ from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
 
 # --- Page config ---
 st.set_page_config(page_title="HR Copilot", layout="wide")
-st.title("🤖 HR Recruitment Copilot")
+st.title(" HR Recruitment Copilot")
 
 # --- Secrets ---
 HF_API_KEY = st.secrets.get("HUGGINGFACE_API_KEY", "")
