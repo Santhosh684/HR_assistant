@@ -66,15 +66,15 @@ Summary:"""
             return result[0]["generated_text"].split("Summary:")[-1].strip()
         return "No summary available."
     else:
-        return f"⚠️ Error: {response.json().get('error', 'Unknown')}"
+        return f" Error: {response.json().get('error', 'Unknown')}"
 
 # --- UI ---
-jd_text = st.text_area("📄 Paste the Job Description (JD):", height=200)
-uploaded_files = st.file_uploader("📤 Upload Resumes (PDFs):", type="pdf", accept_multiple_files=True)
-score_threshold = st.slider("🔻 Score Threshold for Shortlisting", min_value=0, max_value=100, value=70)
+jd_text = st.text_area("  Paste the Job Description (JD):", height=200)
+uploaded_files = st.file_uploader(" Upload Resumes (PDFs):", type="pdf", accept_multiple_files=True)
+score_threshold = st.slider(" Score Threshold for Shortlisting", min_value=0, max_value=100, value=70)
 
 # --- Analysis Button ---
-if st.button("🚀 Run Analysis"):
+if st.button(" Run Analysis"):
     if not HF_API_KEY:
         st.error("Please set your Hugging Face API Key in `.streamlit/secrets.toml`")
     elif not jd_text.strip():
@@ -82,7 +82,7 @@ if st.button("🚀 Run Analysis"):
     elif not uploaded_files:
         st.warning("Please upload at least one resume.")
     else:
-        st.success("✅ Analysis started...")
+        st.success(" Analysis started...")
         results = []
 
         for file in uploaded_files:
@@ -102,12 +102,12 @@ if st.button("🚀 Run Analysis"):
         results.sort(key=lambda x: x["score"], reverse=True)
 
         # --- Shortlisted ---
-        st.subheader("📈 Shortlisted Candidates")
+        st.subheader(" Shortlisted Candidates")
         shortlisted = []
         for res in results:
             if res["score"] >= score_threshold:
                 shortlisted.append(res)
-                st.markdown(f"### ✅ {res['name']}")
+                st.markdown(f"###  {res['name']}")
                 st.markdown(f"**Score:** {res['score']}/100")
                 st.markdown("**Matching Keywords:**")
                 st.write(", ".join(res['keywords']) if res['keywords'] else "None")
@@ -145,7 +145,7 @@ if st.button("🚀 Run Analysis"):
 
         # --- Chart ---
         st.divider()
-        st.subheader("📊 Score Distribution")
+        st.subheader(" Score Distribution")
         candidate_names = [res["name"] for res in results]
         candidate_scores = [res["score"] for res in results]
 
