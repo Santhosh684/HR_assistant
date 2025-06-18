@@ -1,157 +1,99 @@
 import streamlit as st
 import os
 import fitz  # PyMuPDF
-import tempfile
-import requests
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
+from sklearn.feature_extraction.text import TfidfVectorizer
+import re
 
-# --- Page config ---
-st.set_page_config(page_title="HR Copilot", layout="wide")
-st.title(" HR Recruitment Copilot")
+# --------------------------------------
+# Utility Functions
+# --------------------------------------
 
-# --- Secrets ---
-HF_API_KEY = st.secrets.get("HUGGINGFACE_API_KEY", "")
-HF_MODEL = "mistralai/Mixtral-8x7B-Instruct-v0.1"
-HEADERS = {
-    "Authorization": f"Bearer {HF_API_KEY}",
-    "Content-Type": "application/json"
-}
+def clean_text(text):
+    return re.sub(r'[^a-zA-Z\s]', '', text.lower())
 
-# --- Functions ---
-def extract_text_from_pdf(pdf_file):
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-        tmp.write(pdf_file.read())
-        tmp_path = tmp.name
-
+def extract_text_from_pdf(file):
+    doc = fitz.open(stream=file.read(), filetype="pdf")
     text = ""
-    with fitz.open(tmp_path) as doc:
-        for page in doc:
-            text += page.get_text()
-    os.remove(tmp_path)
-    return text
+    for page in doc:
+        text += page.get_text()
+    return clean_text(text)
 
-def get_matching_keywords(jd_text, resume_text):
-    jd_tokens = set(jd_text.lower().split()) - ENGLISH_STOP_WORDS
-    resume_tokens = set(resume_text.lower().split()) - ENGLISH_STOP_WORDS
-    return jd_tokens.intersection(resume_tokens), jd_tokens
+def extract_top_keywords(jd_text, top_n=20):
+    jd_clean = clean_text(jd_text)
+    vectorizer = TfidfVectorizer(stop_words='english', max_features=top_n)
+    X = vectorizer.fit_transform([jd_clean])
+    return vectorizer.get_feature_names_out()
 
-def score_resume(jd_tokens, matched_keywords):
-    if not jd_tokens:
-        return 0
-    return round((len(matched_keywords) / len(jd_tokens)) * 100, 2)
+def score_resume_from_keywords(jd_text, resume_text, top_n=20):
+    jd_keywords = extract_top_keywords(jd_text, top_n)
+    matches = [kw for kw in jd_keywords if kw in resume_text]
+    score = int((len(matches) / top_n) * 100)
+    summary = f"Matched {len(matches)}/{top_n} keywords"
+    return score, summary, matches
 
-def summarize_match(jd, resume):
-    prompt = f"""
-You are an HR assistant. Given the job description and a candidate's resume, explain how well the resume matches the JD in 2-3 lines.
+# --------------------------------------
+# Streamlit UI
+# --------------------------------------
 
-Job Description:
-{jd}
+st.set_page_config(page_title="HR Recruitment Copilot", layout="wide")
+st.title(" HR Recruitment Copilot")
+st.markdown("Upload resumes, provide a Job Description, and let AI rank candidates.")
 
-Resume:
-{resume}
+jd_input = st.text_area(" Paste the Job Description here")
 
-Summary:"""
+uploaded_files = st.file_uploader("📎 Upload Candidate Resumes (PDF only)", type=["pdf"], accept_multiple_files=True)
 
-    response = requests.post(
-        f"https://api-inference.huggingface.co/models/{HF_MODEL}",
-        headers=HEADERS,
-        json={"inputs": prompt}
-    )
+score_threshold = st.slider("Minimum Score Threshold for Shortlisting", 0, 100, 60)
 
-    if response.status_code == 200:
-        result = response.json()
-        if isinstance(result, list) and len(result) > 0:
-            return result[0]["generated_text"].split("Summary:")[-1].strip()
-        return "No summary available."
-    else:
-        return f" Error: {response.json().get('error', 'Unknown')}"
+if st.button("Run Analysis") and jd_input and uploaded_files:
+    results = []
 
-# --- UI ---
-jd_text = st.text_area("  Paste the Job Description (JD):", height=200)
-uploaded_files = st.file_uploader(" Upload Resumes (PDFs):", type="pdf", accept_multiple_files=True)
-score_threshold = st.slider(" Score Threshold for Shortlisting", min_value=0, max_value=100, value=70)
-
-# --- Analysis Button ---
-if st.button(" Run Analysis"):
-    if not HF_API_KEY:
-        st.error("Please set your Hugging Face API Key in `.streamlit/secrets.toml`")
-    elif not jd_text.strip():
-        st.warning("Please enter a job description.")
-    elif not uploaded_files:
-        st.warning("Please upload at least one resume.")
-    else:
-        st.success(" Analysis started...")
-        results = []
-
+    with st.spinner("Analyzing resumes..."):
         for file in uploaded_files:
             resume_text = extract_text_from_pdf(file)
-            matched_keywords, jd_tokens = get_matching_keywords(jd_text, resume_text)
-            score = score_resume(jd_tokens, matched_keywords)
-            summary = summarize_match(jd_text, resume_text)
-
+            score, summary, keywords = score_resume_from_keywords(jd_input, resume_text)
             results.append({
-                "name": file.name,
-                "score": score,
-                "summary": summary,
-                "keywords": sorted(matched_keywords)
+                "Name": file.name,
+                "Score": score,
+                "Summary": summary,
+                "Matched Keywords": ", ".join(keywords)
             })
 
-        # Sort by score descending
-        results.sort(key=lambda x: x["score"], reverse=True)
+    df = pd.DataFrame(results)
+    df_sorted = df.sort_values(by="Score", ascending=False)
 
-        # --- Shortlisted ---
-        st.subheader(" Shortlisted Candidates")
-        shortlisted = []
-        for res in results:
-            if res["score"] >= score_threshold:
-                shortlisted.append(res)
-                st.markdown(f"###  {res['name']}")
-                st.markdown(f"**Score:** {res['score']}/100")
-                st.markdown("**Matching Keywords:**")
-                st.write(", ".join(res['keywords']) if res['keywords'] else "None")
-                st.markdown("**AI Summary:**")
-                st.info(res['summary'])
+    st.subheader(" Candidate Ranking")
+    st.dataframe(df_sorted.reset_index(drop=True))
 
-        # --- CSV Export ---
-        if shortlisted:
-            df_shortlisted = pd.DataFrame([
-                {
-                    "File Name": res["name"],
-                    "Score": res["score"],
-                    "Matching Keywords": ", ".join(res["keywords"]),
-                    "AI Summary": res["summary"]
-                } for res in shortlisted
-            ])
-            st.download_button(
-                label="📥 Download Shortlisted as CSV",
-                data=df_shortlisted.to_csv(index=False).encode('utf-8'),
-                file_name='shortlisted_candidates.csv',
-                mime='text/csv'
-            )
+    # Bar Chart
+    plt.figure(figsize=(5, 3))
+    
+    # st.subheader(" Score Visualization")
+    # fig, ax = plt.subplots(figsize=(3, 4))  # 3:4 ratio (width:height)
+    # ax.barh(df_sorted["Name"], df_sorted["Score"], color='green')
+    # ax.invert_yaxis()
+    # st.pyplot(fig)
 
-        # --- Eliminated ---
-        st.divider()
-        st.subheader("❌ Eliminated Candidates")
-        for res in results:
-            if res["score"] < score_threshold:
-                st.markdown(f"### ❌ {res['name']}")
-                st.markdown(f"**Score:** {res['score']}/100")
-                st.markdown("**Matching Keywords:**")
-                st.write(", ".join(res['keywords']) if res['keywords'] else "None")
-                st.markdown("**AI Summary:**")
-                st.error(res['summary'])
+    # Shortlist based on threshold
+    shortlisted = df_sorted[df_sorted["Score"] >= score_threshold]
+    eliminated = df_sorted[df_sorted["Score"] < score_threshold]
 
-        # --- Chart ---
-        st.divider()
-        st.subheader(" Score Distribution")
-        candidate_names = [res["name"] for res in results]
-        candidate_scores = [res["score"] for res in results]
+    st.success(f"{len(shortlisted)} candidates shortlisted")
+    st.error(f"{len(eliminated)} candidates eliminated")
 
-        fig, ax = plt.subplots(figsize=(10, 4))
-        colors = ['green' if s >= score_threshold else 'red' for s in candidate_scores]
-        ax.barh(candidate_names, candidate_scores, color=colors)
-        ax.set_xlabel("Score")
-        ax.set_title("Candidate Score Overview")
-        st.pyplot(fig)
+    with st.expander("View Shortlisted Candidates"):
+        st.dataframe(shortlisted.reset_index(drop=True))
+
+    with st.expander("View Eliminated Candidates"):
+        st.dataframe(eliminated.reset_index(drop=True))
+
+    # Export to CSV
+    csv = shortlisted.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        label=" Download Shortlisted CSV",
+        data=csv,
+        file_name="shortlisted_candidates.csv",
+        mime="text/csv"
+    )
